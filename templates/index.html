@@ -5,86 +5,197 @@
   <title>Smart Search Viewer</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       margin: 2rem;
       background: #f8f9fa;
+      color: #343a40;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: #0056b3;
+      margin-bottom: 2rem;
+    }
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 2rem;
     }
     input[type="text"] {
-      width: 400px;
-      padding: 10px;
+      flex-grow: 1;
+      padding: 12px;
       font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ced4da;
     }
     button {
-      padding: 10px 15px;
+      padding: 12px 20px;
       font-size: 16px;
       cursor: pointer;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 8px;
+      transition: background-color 0.2s;
     }
-    .result {
+    button:hover {
+      background-color: #0056b3;
+    }
+    .result, .ollama-answer {
       background: white;
-      padding: 15px;
+      padding: 20px;
       border-radius: 8px;
       margin-bottom: 20px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+      border-left: 5px solid #007bff;
     }
-    img {
-      max-width: 100%;
-      height: auto;
-      margin: 10px 0;
+    .ollama-answer {
+      border-left-color: #28a745;
+    }
+    h2 {
+      margin-top: 0;
+      color: #0056b3;
+    }
+    h3 {
+      color: #28a745;
+    }
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
     }
     pre {
-      background: #eee;
-      padding: 10px;
+      background: #e9ecef;
+      padding: 15px;
       overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 14px;
+    }
+    .toggle-button {
+      padding: 8px 12px;
+      font-size: 14px;
+      background-color: #6c757d;
+      margin-top: 10px;
+      display: inline-block;
+    }
+    .toggle-button:hover {
+        background-color: #5a6268;
+    }
+    .full-text {
+      display: none; /* Content hidden by default */
+      margin-top: 15px;
+    }
+    .images-container img {
+      max-width: 200px;
+      height: auto;
+      margin: 10px 10px 0 0;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .status-message {
+        text-align: center;
+        font-style: italic;
+        color: #6c757d;
+        padding: 20px;
     }
   </style>
 </head>
 <body>
 
-  <h1>Smart Search Viewer</h1>
+  <div class="container">
+    <h1>Smart Search Viewer</h1>
 
-  <input type="text" id="queryInput" placeholder="Enter your query..." />
-  <button onclick="search()">Search</button>
+    <div class="search-box">
+      <input type="text" id="queryInput" placeholder="Enter your query..." onkeyup="if(event.key==='Enter') search();" />
+      <button onclick="search()">Search</button>
+    </div>
 
-  <div id="resultsContainer"></div>
+    <div id="ollamaContainer"></div>
+    <div id="resultsContainer"></div>
+  </div>
 
   <script>
     async function search() {
       const query = document.getElementById("queryInput").value.trim();
-      const container = document.getElementById("resultsContainer");
-      container.innerHTML = "<p><em>Loading...</em></p>";
+      if (!query) {
+        alert("Please enter a search query.");
+        return;
+      }
+      
+      const resultsContainer = document.getElementById("resultsContainer");
+      const ollamaContainer = document.getElementById("ollamaContainer");
+
+      resultsContainer.innerHTML = `<p class="status-message"><em>Loading search results... This may take a moment.</em></p>`;
+      ollamaContainer.innerHTML = `<p class="status-message"><em>Fetching content...</em></p>`;
 
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        container.innerHTML = "";
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error(`Server returned an error: ${response.statusText}`);
+        }
+        const data = await response.json();
 
+        // Clear status messages
+        resultsContainer.innerHTML = "";
+        ollamaContainer.innerHTML = "";
+
+        // Display the placeholder for the AI Answer
+        if (data.ollama_answer) {
+            const ollamaDiv = document.createElement("div");
+            ollamaDiv.className = "ollama-answer";
+            ollamaDiv.innerHTML = `<h3>AI Status</h3><p>${data.ollama_answer}</p>`;
+            ollamaContainer.appendChild(ollamaDiv);
+        }
+
+        // Display Search Results
         data.results.forEach((item, index) => {
           const div = document.createElement("div");
           div.className = "result";
 
           const title = `<h2>${index + 1}. ${item.title}</h2>`;
-          const url = `<p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>`;
+          const url = `<p><strong>URL:</strong> <a href="${item.url}" target="_blank" rel="noopener noreferrer">${item.url}</a></p>`;
           const snippet = `<p><strong>Snippet:</strong> ${item.snippet}</p>`;
-          const text = `<pre>${item.full_text}</pre>`;
           
-          let images = "";
+          const toggleButton = `<button class="toggle-button" onclick="toggleText(${index})">Toggle Full Text</button>`;
+          const fullText = `<div class="full-text" id="full-text-${index}"><pre>${item.full_text}</pre></div>`;
+
+          let imagesHTML = "";
           if (item.images && item.images.length > 0) {
-            images = "<div><strong>Images:</strong><br/>";
+            imagesHTML = `<div class="images-container"><strong>Images:</strong><br/>`;
             item.images.forEach(src => {
-              images += `<img src="${src}" alt="Image"/><br/>`;
+              imagesHTML += `<img src="${src}" alt="Scraped image" onerror="this.style.display='none'"/>`;
             });
-            images += "</div>";
-          } else {
-            images = "<p><em>No images found.</em></p>";
+            imagesHTML += "</div>";
           }
 
-          div.innerHTML = title + url + snippet + text + images;
-          container.appendChild(div);
+          div.innerHTML = title + url + snippet + toggleButton + fullText + imagesHTML;
+          resultsContainer.appendChild(div);
         });
 
       } catch (err) {
-        container.innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+        resultsContainer.innerHTML = `<p class="status-message" style="color: red;">Error: ${err.message}</p>`;
+        ollamaContainer.innerHTML = "";
       }
+    }
+
+    function toggleText(index) {
+        const textElement = document.getElementById(`full-text-${index}`);
+        const button = textElement.previousElementSibling; // The toggle button
+        if (textElement.style.display === "none" || textElement.style.display === "") {
+            textElement.style.display = "block";
+            button.textContent = "Hide Full Text";
+        } else {
+            textElement.style.display = "none";
+            button.textContent = "Toggle Full Text";
+        }
     }
   </script>
 </body>
