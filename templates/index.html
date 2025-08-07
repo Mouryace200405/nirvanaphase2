@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Search Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background: #f8f9fa;
+    }
+    input[type="text"] {
+      width: 400px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .result {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      margin: 10px 0;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Smart Search Viewer</h1>
+
+  <input type="text" id="queryInput" placeholder="Enter your query..." />
+  <button onclick="search()">Search</button>
+
+  <div id="resultsContainer"></div>
+
+  <script>
+    async function search() {
+      const query = document.getElementById("queryInput").value.trim();
+      const container = document.getElementById("resultsContainer");
+      container.innerHTML = "<p><em>Loading...</em></p>";
+
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        container.innerHTML = "";
+
+        data.results.forEach((item, index) => {
+          const div = document.createElement("div");
+          div.className = "result";
+
+          const title = `<h2>${index + 1}. ${item.title}</h2>`;
+          const url = `<p><strong>URL:</strong> <a href="${item.url}" target="_blank">${item.url}</a></p>`;
+          const snippet = `<p><strong>Snippet:</strong> ${item.snippet}</p>`;
+          const text = `<pre>${item.full_text}</pre>`;
+          
+          let images = "";
+          if (item.images && item.images.length > 0) {
+            images = "<div><strong>Images:</strong><br/>";
+            item.images.forEach(src => {
+              images += `<img src="${src}" alt="Image"/><br/>`;
+            });
+            images += "</div>";
+          } else {
+            images = "<p><em>No images found.</em></p>";
+          }
+
+          div.innerHTML = title + url + snippet + text + images;
+          container.appendChild(div);
+        });
+
+      } catch (err) {
+        container.innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
